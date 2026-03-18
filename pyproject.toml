@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smartLoan"
+version = "0.1.0"
+description = "Production-grade ML system with full MLOps lifecycle"
+authors = [{ name="gourav", email="gouravkcc1@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "mlflow",
+    "fastapi",
+    "uvicorn",
+    "great-expectations",
+    "evidently",
+    "python-dotenv",
+    "loguru"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "ruff",
+    "mypy"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

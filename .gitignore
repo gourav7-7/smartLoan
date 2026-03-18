@@ -1,0 +1,72 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+.python-version
+
+# =========================
+# Virtual Environments
+# =========================
+proj/
+venv/
+.venv/
+env/
+ENV/
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Packaging
+# =========================
+build/
+dist/
+*.egg-info/
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# ML Artifacts
+# =========================
+artifacts/
+mlruns/
+dvc/
+.dvc/tmp
+
+# =========================
+# Data Folders (better than blocking file types)
+# =========================
+data/
+datasets/
+
+# =========================
+# Testing
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# System
+# =========================
+.DS_Store
+Thumbs.db
