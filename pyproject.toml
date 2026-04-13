@@ -3,11 +3,13 @@ requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "smartLoan"
+name = "smartloan"
 version = "0.1.0"
 description = "Production-grade ML system with full MLOps lifecycle"
-authors = [{ name="gourav", email="gouravkcc1@gmail.com" }]
-readme = "README.md"
+authors = [
+    { name = "gourav", email = "gouravkcc1@gmail.com" }
+]
+
 requires-python = ">=3.10"
 
 dependencies = [
@@ -17,10 +19,11 @@ dependencies = [
     "mlflow",
     "fastapi",
     "uvicorn",
-    "great-expectations",
     "evidently",
     "python-dotenv",
-    "loguru"
+    "loguru",
+    "lightgbm",
+    "xgboost"
 ]
 
 [project.optional-dependencies]
@@ -30,6 +33,9 @@ dev = [
     "ruff",
     "mypy"
 ]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,0 +1,56 @@
+# ============================================================================
+# SmartLoan Credit Default Prediction — docker-compose.yml
+# ============================================================================
+
+services:
+  smartloan:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: smartloan:latest
+    container_name: smartloan_api
+
+    ports:
+      - "8000:8000"       # FastAPI + Dashboard UI
+
+    environment:
+      # ── MLflow ─────────────────────────────────────────────────────────────
+      # SQLite inside the container — persisted via the mlflow volume below.
+      MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+
+      # ── Kaggle credentials ─────────────────────────────────────────────────
+      # Required only if running data_ingestion to download the UCI dataset.
+      # Set these in a .env file next to docker-compose.yml (never commit it):
+      #   KAGGLE_USERNAME=your_username
+      #   KAGGLE_KEY=your_api_key
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+      KAGGLE_KEY:      ${KAGGLE_KEY:-}
+
+      PYTHONUNBUFFERED: "1"
+
+    volumes:
+      # Persist all ML artifacts (models, processed data, evaluation outputs)
+      # across container restarts. Without this, artifacts are lost on stop.
+      - artifacts:/app/artifacts
+
+      # Persist MLflow experiment database across restarts.
+      - mlflow:/app/mlflow.db
+
+      # Persist logs across restarts.
+      - logs:/app/logs
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s    # give uvicorn time to load the model on startup
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  artifacts:
+  mlflow:
+  logs:
