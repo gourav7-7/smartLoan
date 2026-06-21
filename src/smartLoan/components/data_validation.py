@@ -55,7 +55,7 @@ class DataValidation:
 
             # Range Check — credit limit: 10,000 to 1,000,000 NT dollars
             if not df["LIMIT_BAL"].between(10_000, 1_000_000).all():
-                errors.append("LIMIT_BAL out of expected range (10,000 – 1,000,000)")
+                errors.append("LIMIT_BAL out of expected range (10,000 - 1,000,000)")
 
             # Range Check — age: 18 to 100
             if not df["AGE"].between(18, 100).all():

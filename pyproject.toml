@@ -16,14 +16,21 @@ dependencies = [
     "pandas",
     "numpy",
     "scikit-learn",
+    "imblearn",
+    "imbalanced-learn",
+    "lightgbm",
+    "xgboost",
+    "joblib",
+    "matplotlib",
+    "seaborn",
     "mlflow",
     "fastapi",
-    "uvicorn",
-    "evidently",
+    "uvicorn[standard]",
+    "python-multipart",
+    "pydantic>=2",
+    "pydantic-settings",
     "python-dotenv",
-    "loguru",
-    "lightgbm",
-    "xgboost"
+    "kaggle",
 ]
 
 [project.optional-dependencies]

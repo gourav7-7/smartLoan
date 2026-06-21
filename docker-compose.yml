@@ -10,6 +10,7 @@ services:
 
     image: smartloan:latest
     container_name: smartloan_api
+    env_file: .env
 
     ports:
       - "8000:8000"       # FastAPI + Dashboard UI
@@ -17,7 +18,7 @@ services:
     environment:
       # ── MLflow ─────────────────────────────────────────────────────────────
       # SQLite inside the container — persisted via the mlflow volume below.
-      MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+      MLFLOW_TRACKING_URI: sqlite:///mlflow/mlflow.db
 
       # ── Kaggle credentials ─────────────────────────────────────────────────
       # Required only if running data_ingestion to download the UCI dataset.
@@ -35,7 +36,7 @@ services:
       - artifacts:/app/artifacts
 
       # Persist MLflow experiment database across restarts.
-      - mlflow:/app/mlflow.db
+      - mlflow:/app/mlflow
 
       # Persist logs across restarts.
       - logs:/app/logs
@@ -43,7 +44,10 @@ services:
     restart: unless-stopped
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # python is always present in the image; curl is not installed in
+      # python:3.10-slim, so a curl-based check would always report unhealthy.
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -8,11 +8,12 @@ from pathlib import Path
 from smartLoan.utils.logger import logger
 from smartLoan.utils.exceptions import CustomException
 
-MODEL_DIR      = Path("artifacts/models")
-PROCESSED_DIR  = Path("artifacts/processed")
-SCALER_PATH    = PROCESSED_DIR / "scaler.pkl"
-COLUMNS_PATH   = PROCESSED_DIR / "training_columns.txt"
-BEST_INFO_PATH = MODEL_DIR / "best_model_info.json"
+from smartLoan.config import paths as _paths
+MODEL_DIR      = _paths.MODEL_DIR
+PROCESSED_DIR  = _paths.PROCESSED_DATA_DIR
+SCALER_PATH    = _paths.SCALER_PATH
+COLUMNS_PATH   = _paths.COLUMNS_PATH
+BEST_INFO_PATH = _paths.BEST_MODEL_INFO
 
 
 class ModelPrediction:
@@ -85,47 +86,60 @@ class ModelPrediction:
     # ─────────────────────────────────────────────────────────────────────────
     def _engineer_features(self, data: dict) -> pd.DataFrame:
         """
-        Prepares raw UCI input for prediction.
+        Prepares a raw UCI input record for prediction.
 
-        Engineered features must exactly mirror DataTransformation:
-          - PAY_TREND   : mean of PAY_0, PAY_2–PAY_6 (delinquency trend)
-          - UTIL_RATIO  : mean(BILL_AMT1–6) / (LIMIT_BAL + 1)
-          - PAY_TO_BILL : mean(PAY_AMT1–6) / (mean(BILL_AMT1–6) + 1)
+        This MUST mirror DataTransformation step-for-step, or the model is fed
+        features on a different scale than it was trained on (train/serve skew),
+        and every probability it returns is meaningless. The order below is the
+        same as training:
+
+          1. Engineered features, computed from RAW values:
+               UTIL_RATIO   = mean(BILL_AMT1..6) / (LIMIT_BAL + 1)
+               PAY_TREND    = PAY_0 - PAY_6
+               AVG_PAY_AMT  = mean(PAY_AMT1..6)
+               AVG_BILL_AMT = mean(BILL_AMT1..6)
+          2. log1p on PAY_AMT1..6 and AVG_PAY_AMT (skewed, always >= 0).
+             AVG_BILL_AMT and UTIL_RATIO are NOT log-transformed (training skips
+             them — BILL_AMT can be negative).
+          3. Align to the saved training schema (training_columns.txt).
+          4. Clean inf/NaN, then apply the saved StandardScaler.
         """
         df = pd.DataFrame([data])
 
         # ── Identify column groups ────────────────────────────────────────────
-        # FIX: explicitly exclude PAY_AMT columns — startswith("PAY_") alone
-        # incorrectly captures PAY_AMT1–6, mixing amount values (0–1,000,000)
-        # into a status code average (-2 to 9), corrupting PAY_TREND entirely.
-        pay_cols     = [c for c in df.columns if c.startswith("PAY_") and not c.startswith("PAY_AMT")]
         bill_cols    = [f"BILL_AMT{i}" for i in range(1, 7) if f"BILL_AMT{i}" in df.columns]
         pay_amt_cols = [f"PAY_AMT{i}"  for i in range(1, 7) if f"PAY_AMT{i}"  in df.columns]
 
-        # ── Engineer features ─────────────────────────────────────────────────
-        if pay_cols:
-            df["PAY_TREND"]   = df[pay_cols].mean(axis=1)
+        # ── 1. Engineer features from RAW values (exactly as DataTransformation)
         if bill_cols:
-            df["UTIL_RATIO"]  = df[bill_cols].mean(axis=1) / (df["LIMIT_BAL"] + 1)
-        if bill_cols and pay_amt_cols:
-            df["PAY_TO_BILL"] = df[pay_amt_cols].mean(axis=1) / (df[bill_cols].mean(axis=1) + 1)
+            df["UTIL_RATIO"]   = df[bill_cols].mean(axis=1) / (df["LIMIT_BAL"] + 1)
+            df["AVG_BILL_AMT"] = df[bill_cols].mean(axis=1)
+        if {"PAY_0", "PAY_6"}.issubset(df.columns):
+            df["PAY_TREND"]    = df["PAY_0"] - df["PAY_6"]
+        if pay_amt_cols:
+            df["AVG_PAY_AMT"]  = df[pay_amt_cols].mean(axis=1)
 
-        # ── One-hot encode any categorical columns ────────────────────────────
-        cat_cols = df.select_dtypes(include="object").columns.tolist()
-        if cat_cols:
-            df = pd.get_dummies(df, columns=cat_cols, drop_first=True)
+        # ── 2. log1p on the same skewed, non-negative cols as training ─────────
+        #    AVG_PAY_AMT is built from RAW PAY_AMT above, then log1p'd here —
+        #    so it equals log1p(mean(raw)), matching training.
+        for col in pay_amt_cols + ["AVG_PAY_AMT"]:
+            if col in df.columns and (df[col] >= 0).all():
+                df[col] = np.log1p(df[col])
 
-        # ── Align to training schema ──────────────────────────────────────────
+        # ── 3. Align to training schema ───────────────────────────────────────
+        #    Any column the model expects but we didn't build gets created as 0.
+        #    With the engineering above, this no longer silently zeroes out real
+        #    features — it's now only a safety net for genuinely absent columns.
         for col in self.training_columns:
             if col not in df.columns:
                 df[col] = 0
         df = df[self.training_columns]
 
-        # ── Clean infinities / NaNs ───────────────────────────────────────────
+        # ── 4. Clean infinities / NaNs ────────────────────────────────────────
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.fillna(0, inplace=True)
 
-        # ── Apply scaler ──────────────────────────────────────────────────────
+        # ── 5. Apply scaler ───────────────────────────────────────────────────
         if self.scaler is not None:
             scaled = self.scaler.transform(df)
             df = pd.DataFrame(scaled, columns=df.columns)

@@ -5,7 +5,8 @@ import joblib
 import mlflow
 import mlflow.sklearn
 
-mlflow.set_tracking_uri("sqlite:///mlflow.db")
+from smartLoan.config.settings import settings
+mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -59,13 +60,13 @@ class ModelTrainer:
     def smote(self, x_train, y_train):
         """
         UCI ratio: 3.52:1 (neg:pos).
-        SMOTE(0.3) + UnderSampler(0.5) → final ratio ~2:1 (~21K rows).
+        SMOTE + UnderSampler → final ratio ~2:1 (~21K rows).
         Mild rebalancing intentionally — over-rebalancing to 1:1 
         miscalibrates probabilities on a 22% base-rate event.
         """
         pipe = Pipeline([
-            ('over',  SMOTE(sampling_strategy=0.3, random_state=42)),
-            ('under', RandomUnderSampler(sampling_strategy=0.5, random_state=42)),
+            ('over',  SMOTE(sampling_strategy=settings.SMOTE_OVER_RATIO, random_state=settings.RANDOM_STATE)),
+            ('under', RandomUnderSampler(sampling_strategy=settings.SMOTE_UNDER_RATIO, random_state=settings.RANDOM_STATE)),
         ])
         x_res, y_res = pipe.fit_resample(x_train, y_train)
         counts = dict(zip(*np.unique(y_res, return_counts=True)))
@@ -138,7 +139,7 @@ class ModelTrainer:
         CV scores tell us whether a model is stable or just got lucky
         on a single train/test split — critical for reliable model selection.
         """
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        cv = StratifiedKFold(n_splits=settings.CV_FOLDS, shuffle=True, random_state=settings.RANDOM_STATE)
         scores = cross_validate(
             model, x, y, cv=cv,
             scoring={"roc_auc": "roc_auc", "f2": make_scorer(fbeta_score, beta=2)},
@@ -167,10 +168,10 @@ class ModelTrainer:
         in a credit risk context.
         """
         return (
-            0.40 * metrics["f2_score"]       +
-            0.25 * metrics["pr_auc"]         +
-            0.20 * cv_metrics["cv_roc_auc_mean"] +
-            0.15 * metrics["roc_auc"]
+            settings.WEIGHT_F2 * metrics["f2_score"]       +
+            settings.WEIGHT_PR_AUC * metrics["pr_auc"]         +
+            settings.WEIGHT_CV_AUC * cv_metrics["cv_roc_auc_mean"] +
+            settings.WEIGHT_ROC_AUC * metrics["roc_auc"]
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -195,7 +196,7 @@ class ModelTrainer:
                         class_weight="balanced",
                         max_depth=10,
                         min_samples_leaf=10,         # smooths decision boundary on 21K rows
-                        random_state=42, n_jobs=-1
+                        random_state=42, n_jobs=-1   
                     ),
                     "LightGBM": LGBMClassifier(
                         n_estimators=500, learning_rate=0.05,
@@ -214,7 +215,7 @@ class ModelTrainer:
                     ),
                 }
 
-                mlflow.set_experiment("SmartLoan_UCI_CreditDefault")
+                mlflow.set_experiment(settings.MLFLOW_EXPERIMENT_NAME)
                 all_results = {}
 
                 for name, model in models.items():
@@ -239,7 +240,11 @@ class ModelTrainer:
                         mlflow.log_params(model.get_params())
                         for k, v in {**metrics, **cv_metrics, "composite_score": score}.items():
                             mlflow.log_metric(k, v)
-                        mlflow.sklearn.log_model(calibrated, name)
+                        # serialization_format="cloudpickle": MLflow 3.x defaults to
+                        # skops, which refuses to serialize CalibratedClassifierCV's
+                        # internals ("untrusted types"). cloudpickle handles it and is
+                        # backward-compatible with the older MLflow pinned in Docker.
+                        mlflow.sklearn.log_model(calibrated, name, serialization_format="cloudpickle")
 
                         model_path = f"{self.model_dir}/{name}.pkl"
                         joblib.dump({"model": calibrated, "threshold": threshold}, model_path)

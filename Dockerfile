@@ -10,13 +10,14 @@
 FROM python:3.10-slim
 
 # ── System dependencies ───────────────────────────────────────────────────────
-# build-essential: required by lightgbm, xgboost C extensions
-# git:             mlflow may need it for run metadata
-# libgomp1:        OpenMP runtime needed by LightGBM
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        git \
-        libgomp1 \
+# libgomp1 is the ONLY system package required: LightGBM and XGBoost link the
+# OpenMP runtime (libgomp.so.1) at import time. build-essential and git are NOT
+# needed — both libraries install from prebuilt manylinux wheels on PyPI, and
+# MLflow's SQLite backend doesn't shell out to git. Installing fewer packages
+# also means far fewer mirror requests, so the build is less likely to fail on a
+# flaky network. Acquire::Retries makes apt retry transient fetch errors.
+RUN apt-get update -o Acquire::Retries=5 \
+    && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Working directory ─────────────────────────────────────────────────────────
@@ -74,13 +75,14 @@ RUN mkdir -p \
         artifacts/processed \
         artifacts/models \
         artifacts/evaluation \
+        mlflow \
         logs
 
 # ── Environment variables ─────────────────────────────────────────────────────
 # MLflow uses SQLite inside the container by default.
 # Override MLFLOW_TRACKING_URI in docker-compose or at runtime to point to
 # a remote MLflow server for multi-user / persistent experiment tracking.
-ENV MLFLOW_TRACKING_URI=sqlite:///mlflow.db
+ENV MLFLOW_TRACKING_URI=sqlite:///mlflow/mlflow.db
 
 # Kaggle credentials — required by data_ingestion.py to download the dataset.
 # DO NOT hardcode values here. Pass at runtime:

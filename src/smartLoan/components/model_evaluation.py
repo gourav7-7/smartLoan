@@ -20,7 +20,7 @@ from sklearn.metrics import (
 from smartLoan.utils.logger import logger
 from smartLoan.utils.exceptions import CustomException
 
-MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow/mlflow.db")
 mlflow.set_tracking_uri(MLFLOW_URI)
 
 ARTIFACT_DIR = "artifacts/evaluation"

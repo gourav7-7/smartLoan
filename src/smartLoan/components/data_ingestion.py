@@ -23,10 +23,10 @@ class DataIngestion:
             subprocess.run(
                 [
                     "kaggle",
-                    "datasets",        # changed: 'competitions' → 'datasets'
+                    "datasets",        
                     "download",
-                    "-d",              # changed: '-c' (competition) → '-d' (dataset)
-                    self.source,       # format: 'owner/dataset-slug'
+                    "-d",              
+                    self.source,      
                     "-p",
                     str(self.download_dir),
                     "--force"

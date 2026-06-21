@@ -95,6 +95,7 @@ if __name__ == "__main__":
         # 0 = no payment made that month (high risk signal)
         # Very low payments relative to BILL_AMT = customer is barely keeping up
         # Payments close to or exceeding BILL_AMT = financially healthy customer
+        "PAY_AMT1": 20000,   # Paid NT$20,000 in September (full bill)
         "PAY_AMT2": 17000,   # Paid NT$17,000 in August
         "PAY_AMT3": 18500,   # Paid NT$18,500 in July (full bill)
         "PAY_AMT4": 17000,   # Paid NT$17,000 in June
@@ -138,7 +139,7 @@ if __name__ == "__main__":
         logger.info(">>>>>>>>>>>>>>>> Prediction started <<<<<<<<<<<<<<<")
         stage = ModelPredictionStage()
 
-        logger.info("--- Low Risk Customer ---")
+        logger.info("--- Low Risk Customer ---")    
         result_low = stage.main(low_risk_input)
         logger.info(f"Prediction result: {result_low}")
 
