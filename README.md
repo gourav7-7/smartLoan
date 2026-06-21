@@ -202,7 +202,3 @@ All settings live in `.env` (see `.env.example`) and are loaded by `config/setti
 - Drift monitoring on incoming prediction traffic
 
 ---
-
-## License
-
-Released under the MIT License. The UCI dataset retains its original license/terms.
